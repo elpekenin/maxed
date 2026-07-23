@@ -55,7 +55,7 @@ async def chunk(update: Update, text: str) -> None:
         new_len = len(chunk) + len(line)
         if new_len >= telegram.constants.MessageLimit.MAX_TEXT_LENGTH:
             await update.message.reply_text(chunk)
-            chunk = ""
+            chunk = line
         else:
             chunk += line
 
