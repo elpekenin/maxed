@@ -16,5 +16,4 @@ repos:
     hooks:
       - id: ty
         additional_dependencies:
-          - peewee
           - python-telegram-bot

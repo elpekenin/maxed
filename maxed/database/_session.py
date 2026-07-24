@@ -1,26 +1,25 @@
 from __future__ import annotations
 
+import sqlite3
 import typing as t
 from contextlib import contextmanager
-
-import peewee as p
 
 if t.TYPE_CHECKING:
     from collections.abc import Generator
 
 
 @contextmanager
-def session(file: str) -> Generator[p.Database]:
-    db = p.SqliteDatabase(file, autocommit=False)
+def session(file: str) -> Generator[sqlite3.Connection]:
+    conn = sqlite3.Connection(file, autocommit=False)
 
-    db.begin()
+    conn.autocommit = False
 
     try:
-        yield db
+        yield conn
     except Exception as e:
-        db.rollback()
-        db.close()
+        conn.rollback()
+        conn.close()
         raise e from None
 
-    db.commit()
-    db.close()
+    conn.commit()
+    conn.close()

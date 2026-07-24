@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Telegram bot to track maxed Pokémon in Pokémon GO."
 requires-python = ">=3.12"
 dependencies = [
-    "peewee>=4.2.1",
     "playwright>=1.61.0",
+    "python-dotenv>=1.2.2",
     "python-telegram-bot[callback-data]>=22.8",
 ]
 

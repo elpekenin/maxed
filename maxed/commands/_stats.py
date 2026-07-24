@@ -4,14 +4,14 @@ import enum
 import typing as t
 from collections import defaultdict
 
-from maxed import database, pokedex, utils
+from maxed import pokedex, utils
 
 from ._common import get_parser, parse_args
 
 if t.TYPE_CHECKING:
     from telegram import Update
 
-    from maxed.telegram_types import DatabaseContext
+    from maxed.tg import Context, UserData
 
 
 class StatsMode(enum.StrEnum):
@@ -23,10 +23,7 @@ class Stats:
     description: t.ClassVar = "Show information about maxed Pokémon."
 
     @staticmethod
-    async def run(update: Update, ctx: DatabaseContext) -> None:
-        if update.message is None or update.effective_user is None:
-            return
-
+    async def run(update: Update, ctx: Context) -> None:
         parser = get_parser(Stats)
         parser.add_argument(
             "mode",
@@ -38,21 +35,20 @@ class Stats:
         if args is None:
             return
 
-        with ctx.database as db:
-            user_maxed = database.Maxed.by(update.effective_user.id, db)
+        if ctx.user_data is None:
+            utils.panic("user_data is None")
+        user_maxed = ctx.user_data.maxed
 
         match args.mode:
             case StatsMode.SUMMARY:
                 total = sum(maxed.count for maxed in user_maxed)
                 species = sum(maxed.count > 0 for maxed in user_maxed)
 
-                await update.message.reply_text(
-                    f"{total} maxed pokemon ({species} species)",
-                )
+                await utils.reply(update, f"{total} maxed pokemon ({species} species)")
                 return
 
             case StatsMode.LIST:
-                grouped: defaultdict[int, list[database.Maxed]] = defaultdict(list)
+                grouped: defaultdict[int, list[UserData.Maxed]] = defaultdict(list)
 
                 for maxed in user_maxed:
                     grouped[maxed.pokedex].append(maxed)
@@ -73,7 +69,7 @@ class Stats:
 
                     text += f"{pokemon.name.title()}{sep}{sep.join(sort)}\n\n"
 
-                await utils.chunk(update, text)
+                await utils.reply(update, text)
 
             case val:
                 utils.unreachable(val)

@@ -6,14 +6,14 @@ import typing as t
 
 from telegram.constants import ChatAction, ParseMode
 
-from maxed import database, dialgadex, pokedex, utils
+from maxed import dialgadex, pokedex, utils
 
 from ._common import get_parser, parse_args
 
 if t.TYPE_CHECKING:
     from telegram import Update
 
-    from maxed.telegram_types import DatabaseContext
+    from maxed.tg import Context, UserData
 
     type Suggestion = tuple[dialgadex.Counter, int]
 
@@ -36,7 +36,7 @@ def contains(haystack: str, needle: str) -> bool:
 
 def is_available(
     counter: dialgadex.Counter,
-    user_maxed: list[database.Maxed],
+    user_maxed: list[UserData.Maxed],
     lookup_cache: dict[int, pokedex.Species],
 ) -> tuple[t.Literal[True], int] | tuple[t.Literal[False], None]:
     for maxed in user_maxed:
@@ -64,7 +64,7 @@ def is_available(
 
 def get_suggestions(
     counters: list[dialgadex.Counter],
-    user_maxed: list[database.Maxed],
+    user_maxed: list[UserData.Maxed],
     n_suggestions: int,
 ) -> list[Suggestion]:
     lookup_cache: dict[int, pokedex.Species] = {}
@@ -116,10 +116,7 @@ class Counters:
     description: t.ClassVar = "Show best counters against given Pokémon."
 
     @staticmethod
-    async def run(update: Update, ctx: DatabaseContext) -> None:
-        if update.message is None or update.effective_user is None:
-            return
-
+    async def run(update: Update, ctx: Context) -> None:
         parser = get_parser(Counters)
         parser.add_argument("pokemon_name", help="the defending Pokémon")
         parser.add_argument(
@@ -136,33 +133,42 @@ class Counters:
 
         pokemon = pokedex.find_by_name(args.pokemon_name)
         if pokemon is None:
-            await update.message.reply_text(f"unknown pokemon: {args.pokemon_name}")
+            await utils.reply(update, f"unknown pokemon: {args.pokemon_name}")
             return
 
-        await ctx.bot.send_chat_action(
-            chat_id=update.message.chat.id,
-            action=ChatAction.TYPING,
-        )
+        if ctx.user_data is None:
+            utils.panic("user_data is None")
+
+        if update.effective_chat is not None:
+            await ctx.bot.send_chat_action(
+                chat_id=update.effective_chat.id,
+                action=ChatAction.TYPING,
+            )
 
         counters = await get_counters(pokemon)
 
-        with ctx.database as db:
-            user_maxed = database.Maxed.by(update.effective_user.id, db)
+        suggestions = get_suggestions(
+            counters,
+            ctx.user_data.maxed,
+            args.suggestions,
+        )
 
-        suggestions = get_suggestions(counters, user_maxed, args.suggestions)
+        if len(suggestions) == 0:
+            await utils.reply(update, "you dont have good counters yet")
+            return
 
         ids = {i for _, i in suggestions}
         lookup = ",".join(str(i) for i in sorted(ids))
 
-        await update.message.reply_text(
+        await utils.reply(
+            update,
             "\n".join(
                 [
-                    "Best available counters are:",
+                    "Your best counters are:",
                     "```",
                     format_table(suggestions),
                     "```",
-                    "",
-                    f"Filter: ```{lookup}```",
+                    f"Filter: `{lookup}`",
                 ],
             ),
             parse_mode=ParseMode.MARKDOWN_V2,

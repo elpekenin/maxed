@@ -10,13 +10,13 @@ from maxed import utils
 if t.TYPE_CHECKING:
     from telegram import Update
 
-    from maxed.telegram_types import DatabaseContext
+    from maxed import tg
 
     class Command(t.Protocol):
         description: t.ClassVar[str]
 
         @staticmethod
-        async def run(update: Update, ctx: DatabaseContext) -> None: ...
+        async def run(update: Update, ctx: tg.Context) -> None: ...
 
 
 def get_parser(cls: type[Command]) -> argparse.ArgumentParser:
@@ -32,13 +32,10 @@ def get_parser(cls: type[Command]) -> argparse.ArgumentParser:
 async def parse_args(
     parser: argparse.ArgumentParser,
     update: Update,
-    ctx: DatabaseContext,
+    ctx: tg.Context,
 ) -> argparse.Namespace | None:
     try:
         return parser.parse_args(ctx.args or [])
     except argparse.ArgumentError:
-        if update.message is None:
-            utils.panic("no message")
-
-        await update.message.reply_text(parser.format_help())
+        await utils.reply(update, parser.format_help())
         return None

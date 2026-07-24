@@ -5,14 +5,14 @@ import typing as t
 
 from telegram.constants import ParseMode
 
-from maxed import database, pokedex, utils
+from maxed import pokedex, utils
 
 from ._common import get_parser, parse_args
 
 if t.TYPE_CHECKING:
     from telegram import Update
 
-    from maxed.telegram_types import DatabaseContext
+    from maxed.tg import Context, UserData
 
 
 class NonMaxedMode(enum.StrEnum):
@@ -20,7 +20,7 @@ class NonMaxedMode(enum.StrEnum):
     SPECIES = "species"
 
 
-def has_maxed(dex: int, user_maxed: list[database.Maxed]) -> bool:
+def has_maxed(dex: int, user_maxed: list[UserData.Maxed]) -> bool:
     return any(maxed.pokedex == dex for maxed in user_maxed)
 
 
@@ -46,7 +46,7 @@ class NonMaxed:
     description: t.ClassVar = "Show information about non-maxed Pokémon."
 
     @staticmethod
-    async def run(update: Update, ctx: DatabaseContext) -> None:
+    async def run(update: Update, ctx: Context) -> None:
         if update.effective_message is None or update.effective_user is None:
             return
 
@@ -61,8 +61,10 @@ class NonMaxed:
         if args is None:
             return
 
-        with ctx.database as db:
-            user_maxed = database.Maxed.by(update.effective_user.id, db)
+        if ctx.user_data is None:
+            utils.panic("user_data is None")
+
+        user_maxed = ctx.user_data.maxed
 
         missing: list[int] = []
 
@@ -90,7 +92,8 @@ class NonMaxed:
                 utils.unreachable(val)
 
         filter_text = group_ids(missing)
-        await update.effective_message.reply_text(
+        await utils.reply(
+            update,
             f"`{filter_text}`",
             parse_mode=ParseMode.MARKDOWN_V2,
         )

@@ -8,13 +8,13 @@ from copy import copy
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from maxed import database, pokedex, utils
+from maxed import pokedex, utils
+from maxed.tg import UserData
 
 if t.TYPE_CHECKING:
-    from peewee import Database
     from telegram import Update
 
-    from maxed.telegram_types import DatabaseContext
+    from maxed.tg import Context
 
     type CallbackEvent = ChangeSettings | StorePokemon | ChangePokemon | Close
 
@@ -25,21 +25,16 @@ class Data:
     shadow: bool = d.field(default=False, kw_only=True)
     legacy: bool = d.field(default=False, kw_only=True)
 
-    def text(self, db: Database, user_id: int) -> str:
-        maxed = (
-            database.Maxed.select()
-            .where(
-                database.Maxed.user_id == user_id,
-                database.Maxed.pokedex == self.pokemon.pokedex,
-                database.Maxed.shadow == self.shadow,
-                database.Maxed.legacy == self.legacy,
-            )
-            .first(db)
+    def text(self, user_data: UserData) -> str:
+        index = user_data.index(
+            pokedex=self.pokemon.pokedex,
+            shadow=self.shadow,
+            legacy=self.legacy,
         )
 
         shadow = "Shadow" if self.shadow else "Regular"
         legacy = "with" if self.legacy else "without"
-        count = maxed.count if maxed is not None else 0
+        count = user_data.maxed[index].count if index is not None else 0
 
         return f"{shadow} {self.pokemon.name} {legacy} legacy: {count}"
 
@@ -101,39 +96,30 @@ class Data:
     async def message(
         self,
         update: Update,
-        ctx: DatabaseContext,
+        ctx: Context,
         mode: t.Literal["send", "edit", "close"],
     ) -> None:
-        if update.effective_user is None:
+        if update.effective_message is None:
             return
+
+        if ctx.user_data is None:
+            utils.panic("user_data is None")
 
         match mode:
             case "send":
-                if update.message is None:
-                    return
-
-                with ctx.database as db:
-                    await update.message.reply_text(
-                        self.text(db, update.effective_user.id),
-                        reply_markup=self.keyboard(),
-                    )
+                await update.effective_message.reply_text(
+                    self.text(ctx.user_data),
+                    reply_markup=self.keyboard(),
+                )
             case "edit":
-                if update.effective_message is None:
-                    return
-
-                with ctx.database as db:
-                    await update.effective_message.edit_text(
-                        self.text(db, update.effective_user.id),
-                        reply_markup=self.keyboard(),
-                    )
+                await update.effective_message.edit_text(
+                    self.text(ctx.user_data),
+                    reply_markup=self.keyboard(),
+                )
             case "close":
-                if update.effective_message is None:
-                    return
-
-                with ctx.database as db:
-                    await update.effective_message.edit_text(
-                        self.text(db, update.effective_user.id),
-                    )
+                await update.effective_message.edit_text(
+                    self.text(ctx.user_data),
+                )
             case _:
                 utils.unreachable(mode)
 
@@ -160,13 +146,8 @@ class Close:
     data: Data
 
 
-async def callback_query_handler(update: Update, ctx: DatabaseContext) -> None:
-    if (
-        update.callback_query is None
-        or update.callback_query.data is None
-        or update.effective_message is None
-        or update.effective_user is None
-    ):
+async def callback_query_handler(update: Update, ctx: Context) -> None:
+    if update.callback_query is None or update.callback_query.data is None:
         return
 
     event = t.cast("CallbackEvent", update.callback_query.data)
@@ -174,32 +155,29 @@ async def callback_query_handler(update: Update, ctx: DatabaseContext) -> None:
     if isinstance(event, ChangeSettings):
         await event.new_settings.message(update, ctx, "edit")
     elif isinstance(event, StorePokemon):
-        with ctx.database as db:
-            maxed: database.Maxed | None = (
-                database.Maxed.select()
-                .where(
-                    database.Maxed.user_id == update.effective_user.id,
-                    database.Maxed.pokedex == event.data.pokemon.pokedex,
-                    database.Maxed.shadow == event.data.shadow,
-                    database.Maxed.legacy == event.data.legacy,
-                )
-                .first(db)
-            )
+        if ctx.user_data is None:
+            utils.panic("user_data is None")
 
-            if maxed is None:
-                database.Maxed.insert(
-                    user_id=update.effective_user.id,
-                    pokedex=event.data.pokemon.pokedex,
-                    shadow=event.data.shadow,
-                    legacy=event.data.legacy,
-                    count=event.diff,
-                ).execute(db)
-            else:
-                _ = (
-                    database.Maxed.update(count=maxed.count + event.diff)
-                    .where(database.Maxed.id == maxed.id)
-                    .execute(db)
-                )
+        index = ctx.user_data.index(
+            pokedex=event.data.pokemon.pokedex,
+            shadow=event.data.shadow,
+            legacy=event.data.legacy,
+        )
+
+        maxed = (
+            ctx.user_data.maxed[index]
+            if index is not None
+            else UserData.Maxed(
+                pokedex=event.data.pokemon.pokedex,
+                shadow=event.data.shadow,
+                legacy=event.data.legacy,
+            )
+        )
+
+        maxed.count += event.diff
+
+        if not ctx.user_data.store(maxed):
+            await utils.reply(update, "update could not be stored")
 
         await event.data.message(update, ctx, "edit")
     elif isinstance(event, ChangePokemon):

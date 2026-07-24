@@ -9,4 +9,5 @@ wheels/
 # Virtual environments
 .venv
 
-database.sqlite*
+.env
+*.sqlite
