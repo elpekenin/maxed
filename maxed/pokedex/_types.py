@@ -6,14 +6,14 @@ import enum
 from dataclasses import dataclass
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Species:
     pokedex: int
     name: str
     primary: Type
     secondary: Type | None = None
 
-    def best_counter_types(self) -> list[Type]:
+    def best_attacker_types(self) -> list[Type]:
         effectiveness = {
             attacker: (
                 attacker.multiplier(self.primary) * attacker.multiplier(self.secondary)

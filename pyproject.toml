@@ -7,6 +7,8 @@ dependencies = [
     "playwright>=1.61.0",
     "python-dotenv>=1.2.2",
     "python-telegram-bot[callback-data]>=22.8",
+    "sqlmodel>=0.0.39",
+    "vitrine-tg>=0.4.0",
 ]
 
 [build-system]
@@ -23,7 +25,10 @@ dev = [
 [tool.ruff.lint]
 preview = true
 select = ["ALL"]
-ignore = ["D", "missing-copyright-notice"]
+ignore = ["missing-copyright-notice"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"pokebattler.py" = ["N815"] # mixedCase in API response
 
 [tool.ty.analysis]
 strict-literal-narrowing = true
