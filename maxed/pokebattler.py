@@ -106,7 +106,7 @@ class Counter:
         if is_mega:
             name = "Mega " + name
 
-        name, _ = _remove_suffix(name, " form")
+        name, _ = _remove_suffix(name, "_form")
 
         return cls(
             name=_pprint(name),
