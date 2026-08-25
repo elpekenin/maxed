@@ -154,10 +154,10 @@ class UserMaxed:
             if not utils.contains(attacker.name, pokemon.name):
                 continue
 
-            if utils.contains(attacker.name, "Mega_") and item.shadow:
+            if utils.contains(attacker.name, "Mega ") and item.shadow:
                 continue
 
-            if utils.contains(attacker.name, "Shadow_") and not item.shadow:
+            if utils.contains(attacker.name, "Shadow ") and not item.shadow:
                 continue
 
             if attacker.legacy and not item.legacy:

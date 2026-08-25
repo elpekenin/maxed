@@ -67,6 +67,19 @@ def _pprint(val: str) -> str:
     return val.replace("_", " ").title()
 
 
+def _remove_suffix(
+    val: str,
+    suffix: str,
+) -> tuple[str, t.Literal[True]] | tuple[str, t.Literal[False]]:
+    val = val.lower()
+    suffix = suffix.lower()
+
+    if val.endswith(suffix):
+        return val.removesuffix(suffix), True
+
+    return val, False
+
+
 @dataclass(slots=True, frozen=True)
 class Counter:
     """Raid suggestion."""
@@ -89,9 +102,11 @@ class Counter:
             A ``Counter`` instance
 
         """
-        mega = "_MEGA"
-        if name.endswith(mega):
-            name = "Mega " + name.removesuffix(mega)
+        name, is_mega = _remove_suffix(name, "_mega")
+        if is_mega:
+            name = "Mega " + name
+
+        name, _ = _remove_suffix(name, " form")
 
         return cls(
             name=_pprint(name),
