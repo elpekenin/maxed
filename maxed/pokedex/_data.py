@@ -743,7 +743,7 @@ families: list[list[Species]] = [
         Species(502, "dewott", Type.water),
         Species(503, "samurott", Type.water),
     ],
-    [Species(504, "patrat", Type.normal), Species(505, "watchog", Type.normal)],
+    [Species(504, "patrat", Type.normal), Species(505, "watchdog", Type.normal)],
     [
         Species(506, "lillipup", Type.normal),
         Species(507, "herdier", Type.normal),
